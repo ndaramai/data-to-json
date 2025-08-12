@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exam Builder — Sections & Items</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{--bg:#0b0f14;--panel:#121821;--muted:#8aa0b2;--text:#e8eef5;--accent:#5bbaff;--accent2:#7ef0c1;--radius:12px}
+  body{margin:0;background:#0b0f14;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial}
+  .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
+  h1{margin:0 0 6px;font-size:24px}.sub{color:var(--muted);margin:0 0 18px}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  button{border:1px solid #2b3a4d;background:#0f1722;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+  .accent{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#04141b;border:none}
+  .danger{border-color:#3a1e24;background:#201116;color:#ffc7c7}
+  a{color:#9bd2ff;text-decoration:none}
+  .card{background:#121821;border:1px solid #1f2a38;border-radius:var(--radius);padding:16px}
+  .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
+  label{display:block;margin:6px 0;font-weight:600;color:#cfe0ee}
+  input,textarea,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #263343;background:#0e141c;color:var(--text)}
+  textarea{min-height:70px;resize:vertical}
+  .stim-big{min-height:220px}
+  .section,.item{border:1px dashed #2b3a4d;border-radius:12px;padding:12px;background:#0d131b;margin-top:12px}
+  .header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+  .pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#0d2030;border:1px solid #223449;color:#cfe0ee}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  details>summary{cursor:pointer;margin-bottom:8px;color:#cfe0ee}
+  pre{white-space:pre-wrap;background:#0a0f15;border:1px solid #1f2a38;border-radius:10px;padding:12px;max-height:360px;overflow:auto}
+  .hint{color:#8aa0b2;font-size:12px;margin-top:4px}
+  .small{font-size:12px;color:#8aa0b2}
+  .item.collapsed .item-body{display:none}
+  .item-toggle{cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Exam Builder — Sections & Items</h1>
+  <p class="sub">Step 2 of 2. Add sections and questions. Export JSON merges this with the metadata you saved on the previous page.</p>
+
+  <div class="bar">
+    <a href="01-subject.html">← Edit Subject</a>
+    <button id="addSection" class="accent">+ Add Section</button>
+    <button id="export" class="accent">⬇ Export JSON</button>
+    <button id="clearAll" class="danger">Clear All</button>
+    <span id="metaStatus" class="pill">meta: not loaded</span>
+  </div>
+
+  <div class="card" id="sections"></div>
+
+  <div class="card" style="margin-top:12px">
+    <details open>
+      <summary>Preview Output</summary>
+      <pre id="preview" class="mono">(empty)</pre>
+    </details>
+  </div>
+</div>
+
+<template id="tpl-section">
+  <div class="section">
+    <div class="header">
+      <div>
+        <strong>Section <span class="sec-label"></span></strong>
+        <span class="pill">items: <span class="count">0</span></span>
+      </div>
+      <div>
+        <button class="addItem">+ Item</button>
+        <button class="danger removeSec">Remove</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-2"><label>ID</label><input class="sec-id" placeholder="A / B"></div>
+      <div class="col-4"><label>Title</label><input class="sec-title" placeholder="Section A"></div>
+      <div class="col-4"><label>Instructions</label><input class="sec-instr" placeholder="Attempt all questions."></div>
+      <div class="col-2"><label>Total Marks</label><input class="sec-marks" type="number" min="0" placeholder="100"></div>
+    </div>
+    <div class="items"></div>
+  </div>
+</template>
+
+<template id="tpl-item">
+  <div class="item">
+    <div class="header">
+      <div>
+        <strong class="item-toggle">Item <span class="it-label"></span></strong>
+        <span class="pill">type: <span class="type-pill">mcq</span></span>
+      </div>
+      <div>
+        <button class="dup">Duplicate</button>
+        <button class="danger del">Remove</button>
+      </div>
+    </div>
+
+    <div class="item-body">
+      <div class="row">
+        <div class="col-2"><label>Item ID</label><input class="it-id" placeholder="Q1"></div>
+        <div class="col-3">
+          <label>Type</label>
+          <select class="it-type">
+            <option>mcq</option>
+            <option>calculation</option>
+            <option>true_false</option>
+            <option>short_answer</option>
+            <option>fill_blanks</option>
+            <option>ordering</option>
+            <option>matching</option>
+            <option>graph_interpretation</option>
+            <option>figure_analysis</option>
+            <option>diagram_label</option>
+            <option>diagram_completion</option>
+            <option>classification</option>
+            <option>table_completion</option>
+            <option>drawing</option>
+            <option>image_choice</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label>Stimulus</label>
+          <textarea class="it-stim stim-big" placeholder="Paste the full question text / passage / dataset here…"></textarea>
+          <div class="small">You can also set a question image below (separate from assets).</div>
+        </div>
+
+        <div class="col-8"><label>Prompt</label><input class="it-prompt" placeholder="What should the learner do?"></div>
+        <div class="col-2">
+          <label>Answer Format</label>
+          <select class="it-ansfmt">
+            <option value="text">text</option>
+            <option value="numeric">numeric</option>
+            <option value="integer">integer</option>
+            <option value="decimal">decimal</option>
+            <option value="fraction">fraction</option>
+            <option value="boolean">boolean</option>
+            <option value="expression">expression</option>
+            <option value="units">units</option>
+            <option value="table">table</option>
+            <option value="json">json</option>
+            <option value="file">file</option>
+            <option value="image">image</option>
+            <option value="image_selection">image_selection</option>
+          </select>
+        </div>
+        <div class="col-2">
+          <label>Marks</label>
+          <input class="it-marks" type="number" min="0" placeholder="1">
+          <div class="small"><label style="display:flex;gap:8px;align-items:center;margin:6px 0 0">
+            <input type="checkbox" class="it-reqwork" style="width:auto"> requires working
+          </label></div>
+        </div>
+
+        <div class="col-6">
+          <label>Question Image URL (optional)</label>
+          <input class="it-qimg" placeholder="https://…/question.png">
+        </div>
+        <div class="col-6">
+          <label>Assets (role: URL — one per line)</label>
+          <textarea class="it-assets" placeholder="question: https://…/figure.png&#10;answer: https://…/answer-key.png"></textarea>
+          <div class="small">If role omitted, defaults to <code>question</code>.</div>
+        </div>
+
+        <div class="col-12">
+          <details>
+            <summary>Options / Answers</summary>
+            <div class="row">
+              <div class="col-6">
+                <label>Options (one per line)</label>
+                <textarea class="it-options" placeholder="A) …&#10;B) …"></textarea>
+              </div>
+              <div class="col-6">
+                <label>Answer Options for image_selection (JSON or pipe format)</label>
+                <textarea class="it-answer-options" placeholder='JSON array OR lines like:&#10;A | https://…/img.png | description'></textarea>
+              </div>
+
+              <div class="col-12">
+                <label>Answer (JSON or text)</label>
+                <textarea class="it-answer" placeholder='e.g., {"mcq":"A"} or {"calculation":{"final":"25"}}'></textarea>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  const $ = (s, el=document) => el.querySelector(s);
+  const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
+  const KEY_META = 'exam_meta_draft_v1';
+  const KEY_SECTIONS = 'sections_draft_v1';
+
+  // ===== Spec mapping (from your summary) =====
+  const TYPE_TO_FORMATS = {
+    calculation:           ['numeric','text'],
+    table_completion:      ['text','numeric'],
+
+    image_choice:          ['image_selection'],
+    graph_interpretation:  ['numeric','text'],
+    figure_analysis:       ['text'],
+    diagram_label:         ['text','image_selection'],
+    diagram_completion:    ['text','image_selection'],
+
+    mcq:                   ['text'],
+    fill_blanks:           ['text'],
+    short_answer:          ['text'],
+    essay:                 ['text'],
+    true_false:            ['text'],
+
+    classification:        ['text'],
+    ordering:              ['text'],
+    matching:              ['text'],
+    drawing:               ['image','file','text']
+  };
+
+  const TYPE_DEFAULT_FORMAT = {
+    calculation: 'numeric',
+    table_completion: 'text',
+
+    image_choice: 'image_selection',
+    graph_interpretation: 'numeric',
+    figure_analysis: 'text',
+    diagram_label: 'text',
+    diagram_completion: 'text',
+
+    mcq: 'text',
+    fill_blanks: 'text',
+    short_answer: 'text',
+    essay: 'text',
+    true_false: 'text',
+
+    classification: 'text',
+    ordering: 'text',
+    matching: 'text',
+    drawing: 'image'
+  };
+
+  const ANSWER_TEMPLATES = {
+    calculation: () => ({ calculation: { final: "" } }),
+    mcq:         () => ({ mcq: "" }),
+    true_false:  () => ({ true_false: ["T","F"] }),
+    ordering:    () => ({ short_answer: [] }),
+    image_choice:() => ({ correct_image: "" }),
+    numeric:     () => ({ calculation: { final: "" } }),
+    image_selection: () => ({ correct_image: "" }),
+    text:        () => ({ short_answer: "" })
+  };
+  function templateFor(type, fmt){
+    if (ANSWER_TEMPLATES[type]) return ANSWER_TEMPLATES[type]();
+    if (ANSWER_TEMPLATES[fmt])  return ANSWER_TEMPLATES[fmt]();
+    return { short_answer: "" };
+  }
+  function ensureSelectHas(selectEl, value){
+    if (!Array.from(selectEl.options).some(o => o.value === value)) {
+      const opt = document.createElement('option');
+      opt.value = value; opt.textContent = value + ' (custom)';
+      selectEl.appendChild(opt);
+    }
+  }
+
+  const sectionsEl = $('#sections');
+  const tplSec = $('#tpl-section');
+  const tplItem = $('#tpl-item');
+  const preview = $('#preview');
+
+  // Meta badge
+  let examMeta = {};
+  function loadMeta(){
+    try {
+      examMeta = JSON.parse(localStorage.getItem(KEY_META) || '{}') || {};
+      $('#metaStatus').textContent = examMeta.subject ? `meta: ${examMeta.subject} (${examMeta.year||'—'})` : 'meta: not loaded';
+    } catch { $('#metaStatus').textContent = 'meta: not loaded'; }
+  }
+  loadMeta();
+
+  // Draft persist
+  function saveDraft(){
+    const sections = $$('.section', sectionsEl).map(readSection);
+    localStorage.setItem(KEY_SECTIONS, JSON.stringify(sections));
+    renderPreview();
+  }
+  function loadDraft(){
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY_SECTIONS) || '[]');
+      if (Array.isArray(saved) && saved.length) saved.forEach(s => addSection(s));
+      else addSection();
+    } catch { addSection(); }
+  }
+
+  // Actions
+  $('#addSection').addEventListener('click', () => addSection());
+  $('#export').addEventListener('click', exportJSON);
+  $('#clearAll').addEventListener('click', () => {
+    if (!confirm('Clear all sections & items?')) return;
+    localStorage.removeItem(KEY_SECTIONS);
+    sectionsEl.innerHTML = '';
+    addSection();
+    renderPreview();
+  });
+
+  function addSection(data = {}){
+    const node = tplSec.content.firstElementChild.cloneNode(true);
+    sectionsEl.appendChild(node);
+    const idx = $$('.section', sectionsEl).length;
+    $('.sec-label', node).textContent = data.id || idx;
+
+    $('.sec-id', node).value = data.id || '';
+    $('.sec-title', node).value = data.title || '';
+    $('.sec-instr', node).value = data.instructions || '';
+    $('.sec-marks', node).value = data.marks ?? '';
+
+    $('.addItem', node).addEventListener('click', () => addItem($('.items', node)));
+    $('.removeSec', node).addEventListener('click', () => { node.remove(); saveDraft(); });
+
+    const itemsWrap = $('.items', node);
+    (data.items || []).forEach(it => addItem(itemsWrap, it));
+
+    $('.count', node).textContent = $$('.item', itemsWrap).length;
+    $$('.sec-id,.sec-title,.sec-instr,.sec-marks', node).forEach(el => el.addEventListener('input', saveDraft));
+    saveDraft();
+  }
+
+  function addItem(container, data = {}){
+    const node = tplItem.content.firstElementChild.cloneNode(true);
+    container.appendChild(node);
+    const idx = $$('.item', container).length;
+    $('.it-label', node).textContent = data.id || idx;
+
+    // collapse toggle
+    $('.item-toggle', node).addEventListener('click', () => {
+      node.classList.toggle('collapsed');
+    });
+
+    // basics
+    $('.it-id', node).value = data.id || `Q${idx}`;
+    $('.it-type', node).value = data.type || 'mcq';
+    $('.type-pill', node).textContent = $('.it-type', node).value;
+
+    // type change: set default format + answer template, TF options
+    $('.it-type', node).addEventListener('change', e => {
+      const t = e.target.value;
+      $('.type-pill', node).textContent = t;
+      // default answer format for type
+      const ansFmtEl = $('.it-ansfmt', node);
+      const defaultFmt = TYPE_DEFAULT_FORMAT[t] || 'text';
+      ensureSelectHas(ansFmtEl, defaultFmt);
+      ansFmtEl.value = defaultFmt;
+      // answers template
+      const tmpl = templateFor(t, defaultFmt);
+      $('.it-answer', node).value = JSON.stringify(tmpl, null, 2);
+      // seed TF choices
+      if (t === 'true_false' && !$('.it-options', node).value.trim()) {
+        $('.it-options', node).value = 'True\nFalse';
+      }
+      saveDraft();
+    });
+
+    // stimulus & prompt
+    $('.it-stim', node).value = (data.stimulus && data.stimulus.text) || '';
+    $('.it-prompt', node).value = data.prompt || '';
+
+    // question image + assets
+    $('.it-qimg', node).value = (data.stimulus && data.stimulus.question_image) || '';
+    const assets = (data.stimulus && data.stimulus.assets) || [];
+    $('.it-assets', node).value = assets.map(a => `${a.role||'question'}: ${a.url}`).join('\n');
+
+    // Answer Format dropdown (keep custom from old drafts)
+    const ansFmtEl = $('.it-ansfmt', node);
+    const desiredFmt = (data.answer_format || TYPE_DEFAULT_FORMAT[data.type || ''] || 'text').trim();
+    ensureSelectHas(ansFmtEl, desiredFmt);
+    ansFmtEl.value = desiredFmt || 'text';
+
+    // on format change, refresh answer template if needed
+    ansFmtEl.addEventListener('change', () => {
+      const t = $('.it-type', node).value;
+      const fmt = ansFmtEl.value || 'text';
+      const currentText = $('.it-answer', node).value.trim();
+      let reset = false;
+      try {
+        const obj = JSON.parse(currentText || '{}');
+        const wantKeys = Object.keys(templateFor(t, fmt));
+        reset = !wantKeys.every(k => Object.prototype.hasOwnProperty.call(obj, k));
+      } catch { reset = true; }
+      if (reset) $('.it-answer', node).value = JSON.stringify(templateFor(t, fmt), null, 2);
+      saveDraft();
+    });
+
+    // requires_working
+    $('.it-reqwork', node).checked = !!data.requires_working;
+
+    // marks
+    $('.it-marks', node).value = (data.marking && data.marking.total) ?? '';
+
+    // options (text)
+    const opts = data.options || [];
+    $('.it-options', node).value = opts.join('\n');
+
+    // answer_options (for image_selection / image_choice / diagram_* )
+    const aopts = data.answer_options || [];
+    $('.it-answer-options', node).value = aopts.length ? JSON.stringify(aopts, null, 2) : '';
+
+    // answers
+    const answers = data.answers || templateFor(data.type || 'mcq', desiredFmt);
+    $('.it-answer', node).value = Object.keys(answers).length ? JSON.stringify(answers, null, 2) : '{"mcq":"A"}';
+
+    // buttons
+    $('.del', node).addEventListener('click', () => {
+      node.remove();
+      $('.count', container.closest('.section')).textContent = $$('.item', container).length;
+      saveDraft();
+    });
+    $('.dup', node).addEventListener('click', () => {
+      addItem(container, readItem(node));
+      $('.count', container.closest('.section')).textContent = $$('.item', container).length;
+      saveDraft();
+    });
+
+    // save on edits
+    $$('.it-id,.it-type,.it-stim,.it-prompt,.it-marks,.it-options,.it-answer,.it-assets,.it-qimg,.it-answer-options,.it-reqwork', node)
+      .forEach(el => el.addEventListener('input', saveDraft));
+
+    $('.count', container.closest('.section')).textContent = $$('.item', container).length;
+    saveDraft();
+  }
+
+  function readSection(secNode){
+    const id = $('.sec-id', secNode).value.trim();
+    return {
+      id,
+      title: $('.sec-title', secNode).value.trim(),
+      instructions: $('.sec-instr', secNode).value.trim(),
+      marks: numOrNull($('.sec-marks', secNode).value),
+      items: $$('.item', $('.items', secNode)).map(readItem)
+    };
+  }
+
+  function parseAnswerOptions(text){
+    if (!text || !text.trim()) return [];
+    try {
+      const arr = JSON.parse(text);
+      if (Array.isArray(arr)) return arr;
+    } catch {}
+    // fallback: pipe-delimited lines  id | url | description
+    return text.split('\n')
+      .map(s => s.trim()).filter(Boolean)
+      .map(line => {
+        const parts = line.split('|').map(p=>p.trim());
+        return { id: parts[0] || '', image_url: parts[1] || '', description: parts[2] || '' };
+      });
+  }
+
+  function parseAssetsLines(lines, type){
+    return lines.map(line => {
+      const m = line.match(/^\s*([^:]+):\s*(https?:\/\/[^\s]+)\s*$/i);
+      let role, url;
+      if (m) { role = m[1].trim(); url = m[2].trim(); }
+      else { role = 'question'; url = line.trim(); }
+      return { kind: assetKind(type), role, url };
+    });
+  }
+
+  function readItem(itemNode){
+    const type = $('.it-type', itemNode).value;
+    const stimText = $('.it-stim', itemNode).value.trim();
+
+    // assets with roles
+    const assetsLines = $('.it-assets', itemNode).value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const assets = parseAssetsLines(assetsLines, type);
+
+    const stim = (function(){
+      const s = { text: stimText };
+      const qimg = $('.it-qimg', itemNode).value.trim();
+      if (assets.length) s.assets = assets;
+      if (qimg) s.question_image = qimg;
+      return (s.text || s.assets || s.question_image) ? s : { text: "" };
+    })();
+
+    const opts = $('.it-options', itemNode).value.split('\n').map(s=>s.trim()).filter(Boolean);
+
+    let answers;
+    const rawAns = $('.it-answer', itemNode).value;
+    try { answers = JSON.parse(rawAns || '{}'); }
+    catch { answers = { short_answer: (rawAns || '').trim() }; }
+
+    const obj = {
+      id: $('.it-id', itemNode).value.trim(),
+      type,
+      stimulus: stim,
+      prompt: $('.it-prompt', itemNode).value.trim(),
+      ...(opts.length ? { options: opts } : {}),
+      answer_format: $('.it-ansfmt', itemNode).value || (TYPE_DEFAULT_FORMAT[type] || 'text'),
+      marking: { total: numOrNull($('.it-marks', itemNode).value) ?? 0 },
+      answers
+    };
+
+    if ($('.it-reqwork', itemNode).checked) obj.requires_working = true;
+
+    const imgTypes = ['image_selection','image_choice','diagram_label','diagram_completion'];
+    if (imgTypes.includes(obj.answer_format) || imgTypes.includes(type)) {
+      const ao = parseAnswerOptions($('.it-answer-options', itemNode).value || '');
+      if (ao.length) obj.answer_options = ao;
+    }
+
+    return obj;
+  }
+
+  function assetKind(type){
+    if (type.includes('graph')) return 'figure';
+    if (type.includes('diagram')) return 'figure';
+    return 'figure';
+  }
+  function numOrNull(v){ const n = Number(v); return Number.isFinite(n) ? n : null; }
+
+  function buildExam(){
+    loadMeta(); // refresh in case user edited in another tab
+    if (!examMeta || !examMeta.subject) throw new Error('Missing exam metadata. Go back to “Edit Subject”.');
+    const sections = $$('.section', sectionsEl).map(readSection);
+    return [{
+      exam_meta: { ...examMeta },
+      sections,
+      shared_passages: []
+    }];
+  }
+
+  // Validation based on your mapping
+  function validateAll(){
+    const sections = $$('.section', sectionsEl);
+    sections.forEach(sec => {
+      const items = $$('.item', $('.items', sec));
+      items.forEach((it, i) => validateItem(it, i+1, $('.sec-id', sec).value || '?'));
+    });
+  }
+  function validateItem(itemNode, idx, secId){
+    const id   = $('.it-id', itemNode).value.trim() || `Q${idx}`;
+    const type = $('.it-type', itemNode).value;
+    const fmt  = $('.it-ansfmt', itemNode).value || 'text';
+
+    // format allowed?
+    const allowed = TYPE_TO_FORMATS[type] || ['text'];
+    if (!allowed.includes(fmt)) {
+      throw new Error(`Item ${id} (Section ${secId}): answer_format "${fmt}" is not allowed for type "${type}". Allowed: ${allowed.join(', ')}`);
+    }
+
+    // check answers
+    const raw = $('.it-answer', itemNode).value.trim();
+    if (!raw) throw new Error(`Item ${id}: answers field is empty.`);
+
+    let obj;
+    try { obj = JSON.parse(raw); }
+    catch {
+      if (fmt === 'text') return; // allow plain text fallback
+      throw new Error(`Item ${id}: answers must be valid JSON for non-text formats.`);
+    }
+
+    // expectations by format/type
+    if ((fmt === 'numeric' || type === 'calculation') && !(obj.calculation && typeof obj.calculation.final === 'string')) {
+      throw new Error(`Item ${id}: answers.calculation.final (string) required for calculation/numeric.`);
+    }
+    if (type === 'true_false' && !Array.isArray(obj.true_false)) {
+      throw new Error(`Item ${id}: answers.true_false must be an array like ["T","F"].`);
+    }
+    if (type === 'mcq' && typeof obj.mcq !== 'string' && fmt === 'text') {
+      throw new Error(`Item ${id}: answers.mcq must be a string matching the correct option.`);
+    }
+    if ((fmt === 'image_selection' || type === 'image_choice' || type === 'diagram_label' || type === 'diagram_completion') &&
+        typeof obj.correct_image !== 'string') {
+      throw new Error(`Item ${id}: answers.correct_image must be a string like "A".`);
+    }
+
+    // image_selection requires answer_options
+    if (fmt === 'image_selection' || ['image_choice','diagram_label','diagram_completion'].includes(type)) {
+      const aoTxt = $('.it-answer-options', itemNode).value || '[]';
+      const ao = parseAnswerOptions(aoTxt);
+      if (!ao.length) throw new Error(`Item ${id}: image_selection requires answer_options (id, image_url, description).`);
+    }
+  }
+
+  function renderPreview(){
+    try { preview.textContent = JSON.stringify(buildExam(), null, 2); }
+    catch { preview.textContent = '(metadata missing — go back to Step 1)'; }
+  }
+
+  function exportJSON(){
+    try {
+      validateAll(); // enforce mapping before export
+      const data = buildExam();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+      const a = document.createElement('a');
+      const filename = (examMeta.subject || 'Exam').replace(/\s+/g,'_') + '.json';
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+      URL.revokeObjectURL(a.href);
+    } catch(err) { alert(err.message); }
+  }
+
+  // Boot
+  loadDraft();
+  renderPreview();
+</script>
+</body>
+</html>
