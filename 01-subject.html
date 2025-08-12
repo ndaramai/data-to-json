@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exam Builder — Subject</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root { --bg:#0b0f14; --panel:#121821; --muted:#8aa0b2; --text:#e8eef5; --accent:#5bbaff; --radius:12px; }
+  html,body{height:100%}
+  body{margin:0;background:#0b0f14;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial}
+  .wrap{max-width:900px;margin:28px auto;padding:0 16px}
+  h1{margin:0 0 6px;font-size:24px}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .card{background:#121821;border:1px solid #1f2a38;border-radius:var(--radius);padding:16px}
+  .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .col-12{grid-column:span 12}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
+  label{display:block;margin:6px 0;font-weight:600;color:#cfe0ee}
+  input,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #263343;background:#0e141c;color:var(--text)}
+  textarea{min-height:84px;resize:vertical}
+  .toolbar{display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap}
+  button{border:1px solid #2b3a4d;background:#0f1722;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+  .accent{background:linear-gradient(90deg,#5bbaff,#7ef0c1);color:#04141b;border:none}
+  .link{color:#9bd2ff;text-decoration:none}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Exam Builder — Subject</h1>
+    <p class="sub">Step 1 of 2: Enter exam metadata. Click “Save & Continue” to go to Sections.</p>
+
+    <div class="card">
+      <div class="row">
+        <div class="col-6"><label>Subject</label><input id="subject" placeholder="Primary Mathematics"></div>
+        <div class="col-3"><label>Subject Code</label><input id="subject_code" placeholder="001"></div>
+        <div class="col-3"><label>Level</label><input id="level" placeholder="Primary / Secondary"></div>
+
+        <div class="col-3"><label>Class</label><input id="class" placeholder="P6 / O-Level"></div>
+        <div class="col-2"><label>Year</label><input id="year" type="number" min="1900" max="2100" placeholder="2025"></div>
+        <div class="col-2"><label>Paper</label><input id="paper" placeholder="I / II"></div>
+        <div class="col-3"><label>Duration (minutes)</label><input id="duration_minutes" type="number" min="1" placeholder="120"></div>
+        <div class="col-2"><label>Locale</label><input id="locale" placeholder="en"></div>
+
+        <div class="col-12">
+          <label>General Instructions (one per line)</label>
+          <textarea id="instructions" placeholder="Write your names and index number as on the registration form.&#10;Do not open this question paper until told to do so."></textarea>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="accent" id="save">Save & Continue →</button>
+        <button id="clear">Clear</button>
+        <a href="02-sections.html" class="link" id="goto">Go to Sections (use current draft)</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  const KEY = 'exam_meta_draft_v1';
+
+  // Load draft
+  (function init(){
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+      for (const [k,v] of Object.entries(saved)) {
+        const el = document.getElementById(k);
+        if (!el) continue;
+        if (k === 'instructions' && Array.isArray(v)) el.value = v.join('\n');
+        else el.value = v ?? '';
+      }
+    } catch {}
+  })();
+
+  function readMeta(){
+    return {
+      subject: $('#subject').value.trim(),
+      subject_code: $('#subject_code').value.trim(),
+      level: $('#level').value.trim(),
+      class: $('#class').value.trim(),
+      year: Number($('#year').value || 0),
+      paper: $('#paper').value.trim(),
+      duration_minutes: Number($('#duration_minutes').value || 0),
+      locale: $('#locale').value.trim(),
+      instructions: $('#instructions').value.trim()
+        ? $('#instructions').value.split('\n').map(s=>s.trim()).filter(Boolean)
+        : []
+    };
+  }
+
+  function validate(meta){
+    const missing = ['subject','year'].filter(k => !meta[k]);
+    if (missing.length) throw new Error(`Missing: ${missing.join(', ')}`);
+  }
+
+  $('#save').addEventListener('click', () => {
+    try {
+      const meta = readMeta();
+      validate(meta);
+      localStorage.setItem(KEY, JSON.stringify(meta));
+      location.href = '02-sections.html';
+    } catch(err) { alert(err.message); }
+  });
+
+  $('#clear').addEventListener('click', () => {
+    if (!confirm('Clear the form and remove saved draft?')) return;
+    localStorage.removeItem(KEY);
+    document.querySelectorAll('input, textarea').forEach(el => el.value = '');
+  });
+
+  // Auto-save
+  document.querySelectorAll('input, textarea').forEach(el => {
+    el.addEventListener('input', () => {
+      const meta = readMeta();
+      localStorage.setItem(KEY, JSON.stringify(meta));
+    });
+  });
+</script>
+</body>
+</html>
