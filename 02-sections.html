@@ -16,7 +16,7 @@
   a{color:#9bd2ff;text-decoration:none}
   .card{background:#121821;border:1px solid #1f2a38;border-radius:var(--radius);padding:16px}
   .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-  .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
+  .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-7{grid-column:span 7}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-2{grid-column:span 2}
   label{display:block;margin:6px 0;font-weight:600;color:#cfe0ee}
   input,textarea,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #263343;background:#0e141c;color:var(--text)}
   textarea{min-height:70px;resize:vertical}
@@ -42,8 +42,11 @@
     <a href="01-subject.html">← Edit Subject</a>
     <button id="addSection" class="accent">+ Add Section</button>
     <button id="export" class="accent">⬇ Export JSON</button>
+    <button id="saveDraft" title="Save sections to draft">💾 Save Draft</button>
+    <button id="saveExit" title="Save and return to Index">Save & Back to Index</button>
     <button id="clearAll" class="danger">Clear All</button>
     <span id="metaStatus" class="pill">meta: not loaded</span>
+    <span id="status" class="pill" style="display:none">saved</span>
   </div>
 
   <div class="card" id="sections"></div>
@@ -188,51 +191,43 @@
   const KEY_META = 'exam_meta_draft_v1';
   const KEY_SECTIONS = 'sections_draft_v1';
 
-  // ===== Spec mapping (from your summary) =====
+  // ===== Spec mapping (kept) =====
   const TYPE_TO_FORMATS = {
     calculation:           ['numeric','text'],
     table_completion:      ['text','numeric'],
-
     image_choice:          ['image_selection'],
     graph_interpretation:  ['numeric','text'],
     figure_analysis:       ['text'],
     diagram_label:         ['text','image_selection'],
     diagram_completion:    ['text','image_selection'],
-
     mcq:                   ['text'],
     fill_blanks:           ['text'],
     short_answer:          ['text'],
     essay:                 ['text'],
     true_false:            ['text'],
-
     classification:        ['text'],
     ordering:              ['text'],
     matching:              ['text'],
     drawing:               ['image','file','text']
   };
-
   const TYPE_DEFAULT_FORMAT = {
     calculation: 'numeric',
     table_completion: 'text',
-
     image_choice: 'image_selection',
     graph_interpretation: 'numeric',
     figure_analysis: 'text',
     diagram_label: 'text',
     diagram_completion: 'text',
-
     mcq: 'text',
     fill_blanks: 'text',
     short_answer: 'text',
     essay: 'text',
     true_false: 'text',
-
     classification: 'text',
     ordering: 'text',
     matching: 'text',
     drawing: 'image'
   };
-
   const ANSWER_TEMPLATES = {
     calculation: () => ({ calculation: { final: "" } }),
     mcq:         () => ({ mcq: "" }),
@@ -271,7 +266,16 @@
   }
   loadMeta();
 
-  // Draft persist
+  function flash(msg='Saved'){
+    const s = $('#status');
+    s.textContent = msg;
+    s.style.display = 'inline-block';
+    s.style.opacity = '1';
+    setTimeout(()=>{ s.style.opacity='0.0'; }, 1200);
+    setTimeout(()=>{ s.style.display='none'; s.style.opacity='1'; }, 1800);
+  }
+
+  // Persist
   function saveDraft(){
     const sections = $$('.section', sectionsEl).map(readSection);
     localStorage.setItem(KEY_SECTIONS, JSON.stringify(sections));
@@ -294,6 +298,14 @@
     sectionsEl.innerHTML = '';
     addSection();
     renderPreview();
+  });
+  $('#saveDraft').addEventListener('click', () => {
+    saveDraft();
+    flash('Draft saved');
+  });
+  $('#saveExit').addEventListener('click', () => {
+    saveDraft();
+    location.href = 'index.html';
   });
 
   function addSection(data = {}){
@@ -334,19 +346,16 @@
     $('.it-type', node).value = data.type || 'mcq';
     $('.type-pill', node).textContent = $('.it-type', node).value;
 
-    // type change: set default format + answer template, TF options
+    // type change
     $('.it-type', node).addEventListener('change', e => {
       const t = e.target.value;
       $('.type-pill', node).textContent = t;
-      // default answer format for type
       const ansFmtEl = $('.it-ansfmt', node);
       const defaultFmt = TYPE_DEFAULT_FORMAT[t] || 'text';
       ensureSelectHas(ansFmtEl, defaultFmt);
       ansFmtEl.value = defaultFmt;
-      // answers template
       const tmpl = templateFor(t, defaultFmt);
       $('.it-answer', node).value = JSON.stringify(tmpl, null, 2);
-      // seed TF choices
       if (t === 'true_false' && !$('.it-options', node).value.trim()) {
         $('.it-options', node).value = 'True\nFalse';
       }
@@ -362,13 +371,11 @@
     const assets = (data.stimulus && data.stimulus.assets) || [];
     $('.it-assets', node).value = assets.map(a => `${a.role||'question'}: ${a.url}`).join('\n');
 
-    // Answer Format dropdown (keep custom from old drafts)
+    // Answer Format dropdown (keep custom)
     const ansFmtEl = $('.it-ansfmt', node);
     const desiredFmt = (data.answer_format || TYPE_DEFAULT_FORMAT[data.type || ''] || 'text').trim();
     ensureSelectHas(ansFmtEl, desiredFmt);
     ansFmtEl.value = desiredFmt || 'text';
-
-    // on format change, refresh answer template if needed
     ansFmtEl.addEventListener('change', () => {
       const t = $('.it-type', node).value;
       const fmt = ansFmtEl.value || 'text';
@@ -393,7 +400,7 @@
     const opts = data.options || [];
     $('.it-options', node).value = opts.join('\n');
 
-    // answer_options (for image_selection / image_choice / diagram_* )
+    // answer_options (image types)
     const aopts = data.answer_options || [];
     $('.it-answer-options', node).value = aopts.length ? JSON.stringify(aopts, null, 2) : '';
 
@@ -438,7 +445,6 @@
       const arr = JSON.parse(text);
       if (Array.isArray(arr)) return arr;
     } catch {}
-    // fallback: pipe-delimited lines  id | url | description
     return text.split('\n')
       .map(s => s.trim()).filter(Boolean)
       .map(line => {
@@ -461,7 +467,6 @@
     const type = $('.it-type', itemNode).value;
     const stimText = $('.it-stim', itemNode).value.trim();
 
-    // assets with roles
     const assetsLines = $('.it-assets', itemNode).value.split('\n').map(s=>s.trim()).filter(Boolean);
     const assets = parseAssetsLines(assetsLines, type);
 
@@ -520,7 +525,7 @@
     }];
   }
 
-  // Validation based on your mapping
+  // Validation (kept for Export)
   function validateAll(){
     const sections = $$('.section', sectionsEl);
     sections.forEach(sec => {
@@ -533,24 +538,21 @@
     const type = $('.it-type', itemNode).value;
     const fmt  = $('.it-ansfmt', itemNode).value || 'text';
 
-    // format allowed?
     const allowed = TYPE_TO_FORMATS[type] || ['text'];
     if (!allowed.includes(fmt)) {
       throw new Error(`Item ${id} (Section ${secId}): answer_format "${fmt}" is not allowed for type "${type}". Allowed: ${allowed.join(', ')}`);
     }
 
-    // check answers
     const raw = $('.it-answer', itemNode).value.trim();
     if (!raw) throw new Error(`Item ${id}: answers field is empty.`);
 
     let obj;
     try { obj = JSON.parse(raw); }
     catch {
-      if (fmt === 'text') return; // allow plain text fallback
+      if (fmt === 'text') return;
       throw new Error(`Item ${id}: answers must be valid JSON for non-text formats.`);
     }
 
-    // expectations by format/type
     if ((fmt === 'numeric' || type === 'calculation') && !(obj.calculation && typeof obj.calculation.final === 'string')) {
       throw new Error(`Item ${id}: answers.calculation.final (string) required for calculation/numeric.`);
     }
@@ -565,7 +567,6 @@
       throw new Error(`Item ${id}: answers.correct_image must be a string like "A".`);
     }
 
-    // image_selection requires answer_options
     if (fmt === 'image_selection' || ['image_choice','diagram_label','diagram_completion'].includes(type)) {
       const aoTxt = $('.it-answer-options', itemNode).value || '[]';
       const ao = parseAnswerOptions(aoTxt);
@@ -580,7 +581,7 @@
 
   function exportJSON(){
     try {
-      validateAll(); // enforce mapping before export
+      validateAll();
       const data = buildExam();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
       const a = document.createElement('a');
