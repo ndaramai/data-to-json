@@ -21,6 +21,8 @@
   button{border:1px solid #2b3a4d;background:#0f1722;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
   .accent{background:linear-gradient(90deg,#5bbaff,#7ef0c1);color:#04141b;border:none}
   .link{color:#9bd2ff;text-decoration:none}
+  .pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#0d2030;border:1px solid #223449;color:#cfe0ee}
+  .muted{color:#8aa0b2}
 </style>
 </head>
 <body>
@@ -47,10 +49,14 @@
       </div>
 
       <div class="toolbar">
+        <button id="saveDraft">💾 Save Draft</button>
         <button class="accent" id="save">Save & Continue →</button>
+        <button id="saveExit">Save & Back to Index</button>
+        <span id="status" class="pill" style="display:none">saved</span>
         <button id="clear">Clear</button>
         <a href="02-sections.html" class="link" id="goto">Go to Sections (use current draft)</a>
       </div>
+      <div class="muted" style="margin-top:6px">Draft saves to localStorage and can be resumed from <a class="link" href="index.html">index</a>.</div>
     </div>
   </div>
 
@@ -92,6 +98,21 @@
     if (missing.length) throw new Error(`Missing: ${missing.join(', ')}`);
   }
 
+  function flash(msg='Saved'){
+    const s = $('#status');
+    s.textContent = msg;
+    s.style.display = 'inline-block';
+    s.style.opacity = '1';
+    setTimeout(()=>{ s.style.opacity='0.0'; }, 1200);
+    setTimeout(()=>{ s.style.display='none'; s.style.opacity='1'; }, 1800);
+  }
+
+  $('#saveDraft').addEventListener('click', () => {
+    const meta = readMeta();
+    localStorage.setItem(KEY, JSON.stringify(meta));
+    flash('Draft saved');
+  });
+
   $('#save').addEventListener('click', () => {
     try {
       const meta = readMeta();
@@ -99,6 +120,13 @@
       localStorage.setItem(KEY, JSON.stringify(meta));
       location.href = '02-sections.html';
     } catch(err) { alert(err.message); }
+  });
+
+  $('#saveExit').addEventListener('click', () => {
+    const meta = readMeta();
+    // Save without hard validation (it's an exit)
+    localStorage.setItem(KEY, JSON.stringify(meta));
+    location.href = 'index.html';
   });
 
   $('#clear').addEventListener('click', () => {
